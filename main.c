@@ -13,12 +13,14 @@ int main(int argc, char const *argv[]) {
 	if(!data) {
 		error("Unable to parse asm");
 	}
+	printf("[Linking ASM]\n");
 	parse_asm(data);
 	free(data);
 
 	dump_asm("tmp.bin");
-	char *binary = load_asm("./tmp.bin");
+	char *binary = load_asm("./tmp.bin") + 8;
 
+	printf("[Executing Binary]\n");
 	execute(binary);
 	return 0;
 }
@@ -177,12 +179,20 @@ OPCode get_op_by_string(char *name) {
 		return OP_STA;
 	} else if(strcmp(name, "add") == 0) {
 		return OP_ADD;
+	} else if(strcmp(name, "addf") == 0) {
+		return OP_ADDF;
 	} else if(strcmp(name, "sub") == 0) {
 		return OP_SUB;
+	} else if(strcmp(name, "subf") == 0) {
+		return OP_SUBF;
 	} else if(strcmp(name, "mul") == 0) {
 		return OP_MUL;
+	} else if(strcmp(name, "mulf") == 0) {
+		return OP_MULF;
 	} else if(strcmp(name, "div") == 0) {
 		return OP_DIV;
+	} else if(strcmp(name, "divf") == 0) {
+		return OP_DIVF;
 	} else if(strcmp(name, "cmplt") == 0) {
 		return OP_CMPLT;
 	} else if(strcmp(name, "cmpgt") == 0) {
@@ -204,6 +214,9 @@ OPCode get_op_by_string(char *name) {
 
 void dump_asm(char *file) {
 	FILE *fp = fopen(file, "wb");
+
+	char magic[] = "CHIPCODE";
+	fwrite(magic, sizeof(char), 8, fp);
 	for(ListNode *i = list_begin(&codes); i != list_end(&codes); i = list_next(i)) {
 		Code *code = (Code*)i;
 		fwrite(&code->op, sizeof(OPCode), 1, fp);
@@ -239,15 +252,14 @@ bool starts_with(const char *str, const char *pre) {
 }
 
 void execute(char *binary) {
-	char var_stack[65535];
-	char prg_stack[65535];
+	char *var_stack = malloc(sizeof(char) * 65535);
+	char *prg_stack = malloc(sizeof(char) * 65535);
 
 	List return_ip;
 	list_clear(&return_ip);
 
 	uint32_t ip = 0;
 	uint32_t sp = 0;
-	uint32_t fp = 0;
 
 	while(true) {
 		uint32_t offset = (ip * (sizeof(OPCode) + sizeof(int) + sizeof(int)));
@@ -259,130 +271,189 @@ void execute(char *binary) {
 
 		switch(op) {
 			case OP_PUSH: {
-				memcpy(&prg_stack[fp + sp], &left, 4);
+				memcpy(&prg_stack[sp], &left, 4);
 				sp += 4;
 			}
 			break;
 			case OP_LOAD: {
-				memcpy(&prg_stack[fp + sp], &var_stack[fp + left], 4);
+				memcpy(&prg_stack[sp], &var_stack[left], 4);
 				sp += 4;
 			}
 			break;
 			case OP_STORE: {
 				sp -= 4;
-				memcpy(&var_stack[fp + left], &prg_stack[fp + sp], 4);
+				memcpy(&var_stack[left], &prg_stack[sp], 4);
 			}
 			break;
 			case OP_LDA: {
 				// load addr(refrence)
-				left += fp; // relative to fp
-				memcpy(&prg_stack[fp + sp], &left, 4);
-				sp += 4;
+				uint64_t real_addr = (uint64_t)(left + var_stack);
+				memcpy(&prg_stack[sp], &real_addr, 8);
+				sp += 8;
 			}
 			break;
 			case OP_DEREF: {
-				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				sp -= 8;
+				uint64_t pop1 = *(uint64_t*)&prg_stack[sp];
 
-				memcpy(&prg_stack[fp + sp], &var_stack[pop1], 4);
+				memcpy(&prg_stack[sp], (char*)pop1, 4);
 				sp += 4;
 			}
 			break;
 			case OP_STA: {
 				// store addr
-				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				sp -= 8;
+				uint64_t pop1 = *(uint64_t*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 
-				memcpy(&var_stack[pop1], &pop2, 4);
+				memcpy((char*)pop1, &pop2, 4);
 			}
 			break;
 			case OP_ADD: {
 				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 
 
 				int result = pop1 + pop2;
 
-				memcpy(&prg_stack[fp + sp], &result, 4);
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_ADDF: {
+				sp -= 4;
+				float pop1 = *(float*)&prg_stack[sp];
+
+				sp -= 4;
+				float pop2 = *(float*)&prg_stack[sp];
+
+
+				float result = pop1 + pop2;
+
+				memcpy(&prg_stack[sp], &result, 4);
 				sp += 4;
 			}
 			break;
 			case OP_SUB: {
 				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 
 				int result = pop1 - pop2;
 				
-				memcpy(&prg_stack[fp + sp], &result, 4);
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_SUBF: {
+				sp -= 4;
+				float pop1 = *(float*)&prg_stack[sp];
+
+				sp -= 4;
+				float pop2 = *(float*)&prg_stack[sp];
+
+				float result = pop1 - pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
 				sp += 4;
 			}
 			break;
 			case OP_MUL: {
 				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 
 				int result = pop1 * pop2;
 				
-				memcpy(&prg_stack[fp + sp], &result, 4);
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_MULF: {
+				sp -= 4;
+				float pop1 = *(float*)&prg_stack[sp];
+
+				sp -= 4;
+				float pop2 = *(float*)&prg_stack[sp];
+
+				float result = pop1 * pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
 				sp += 4;
 			}
 			break;
 			case OP_DIV: {
 				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 
 				int result = pop1 / pop2;
 				
-				memcpy(&prg_stack[fp + sp], &result, 4);
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_DIVF: {
+				sp -= 4;
+				float pop1 = *(float*)&prg_stack[sp];
+
+				sp -= 4;
+				float pop2 = *(float*)&prg_stack[sp];
+
+				float result = pop1 / pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
 				sp += 4;
 			}
 			break;
 			case OP_CMPLT: {
 				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 
 				int result = pop1 < pop2;
 				
-				memcpy(&prg_stack[fp + sp], &result, 4);
+				memcpy(&prg_stack[sp], &result, 4);
 				sp += 4;
 			}
 			break;
 			case OP_CMPGT: {
 				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 
 				int result = pop1 > pop2;
 				
-				memcpy(&prg_stack[fp + sp], &result, 4);
+				memcpy(&prg_stack[sp], &result, 4);
 				sp += 4;
 			}
 			break;
 			case OP_RET: {
 				if(list_size(&return_ip) > 0) {
+
 					ReturnIP *rtn = (ReturnIP*)list_remove(list_back(&return_ip));
 					ip = rtn->index;
-					fp = rtn->fp;
+
+					memcpy(&rtn->prg_stack[sp - left], &prg_stack[sp - left], left);
+
+					prg_stack = rtn->prg_stack;
+					var_stack = rtn->var_stack;
+
 					free(rtn);
 					continue;
 				} else {
@@ -392,10 +463,10 @@ void execute(char *binary) {
 			break;
 			case OP_JE: {
 				sp -= 4;
-				int pop1 = *(int*)&prg_stack[fp + sp];
+				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
-				int pop2 = *(int*)&prg_stack[fp + sp];
+				int pop2 = *(int*)&prg_stack[sp];
 				if(pop1 == pop2) {
 					ip = left;
 					continue;
@@ -412,10 +483,16 @@ void execute(char *binary) {
 
 				ReturnIP *rtn = malloc(sizeof(ReturnIP));
 				rtn->index = ip + 1;
-				rtn->fp = fp;
-				fp = sp;
+				rtn->prg_stack = prg_stack;
+				rtn->var_stack = var_stack;
 
-				memcpy(&var_stack[fp + 0], &prg_stack[rtn->fp + sp], right);
+				char *prg_stack_t = malloc(sizeof(char) * 65535);
+				char *var_stack_t = malloc(sizeof(char) * 65535);
+
+				memcpy(&var_stack_t[0], &prg_stack[sp], right); // copy args
+
+				prg_stack = prg_stack_t;
+				var_stack = var_stack_t;
 
 				list_insert(list_end(&return_ip), rtn);
 				ip = left;
@@ -426,8 +503,18 @@ void execute(char *binary) {
 				if(left == 0) {
 					// print
 					sp -= 4;
-					int pop1 = *(int*)&prg_stack[fp + sp];
+					int pop1 = *(int*)&prg_stack[sp];
 					printf("%i\n", pop1);
+				} else if(left == 1) {
+					// print
+					sp -= 4;
+					float pop1 = *(float*)&prg_stack[sp];
+					printf("%f\n", pop1);
+				} else if(left == 2) {
+					// print
+					sp -= 4;
+					int pop1 = *(int*)&prg_stack[sp];
+					sleep(pop1);
 				} else {
 					printf("unknown syscall code %i\n", left);
 					goto terminate;

@@ -12,9 +12,13 @@ typedef enum {
 	OP_STA,
 
 	OP_ADD,
+	OP_ADDF,
 	OP_SUB,
+	OP_SUBF,
 	OP_MUL,
+	OP_MULF,
 	OP_DIV,
+	OP_DIVF,
 
 	OP_CMPLT,
 	OP_CMPGT,
@@ -44,7 +48,8 @@ typedef struct _Code {
 typedef struct _ReturnIP {
 	ListNode node;
 	int index;
-	int fp;
+	char *prg_stack;
+	char *var_stack;
 } ReturnIP;
 
 void error(char *format, ...);
