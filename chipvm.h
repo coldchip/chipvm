@@ -11,6 +11,9 @@ typedef enum {
 	OP_DEREF,
 	OP_STA,
 
+	OP_CF2I32,
+	OP_CI2F32,
+
 	OP_ADD,
 	OP_ADDF,
 	OP_SUB,
@@ -21,7 +24,9 @@ typedef enum {
 	OP_DIVF,
 
 	OP_CMPLT,
+	OP_CMPLTF,
 	OP_CMPGT,
+	OP_CMPGTF,
 
 	OP_JE,
 	OP_JMP,

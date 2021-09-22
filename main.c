@@ -177,6 +177,10 @@ OPCode get_op_by_string(char *name) {
 		return OP_DEREF;
 	} else if(strcmp(name, "sta") == 0) {
 		return OP_STA;
+	} else if(strcmp(name, "cf2i32") == 0) {
+		return OP_CF2I32;
+	} else if(strcmp(name, "ci2f32") == 0) {
+		return OP_CI2F32;
 	} else if(strcmp(name, "add") == 0) {
 		return OP_ADD;
 	} else if(strcmp(name, "addf") == 0) {
@@ -195,8 +199,12 @@ OPCode get_op_by_string(char *name) {
 		return OP_DIVF;
 	} else if(strcmp(name, "cmplt") == 0) {
 		return OP_CMPLT;
+	} else if(strcmp(name, "cmpltf") == 0) {
+		return OP_CMPLTF;
 	} else if(strcmp(name, "cmpgt") == 0) {
 		return OP_CMPGT;
+	} else if(strcmp(name, "cmpgtf") == 0) {
+		return OP_CMPGTF;
 	} else if(strcmp(name, "je") == 0) {
 		return OP_JE;
 	} else if(strcmp(name, "jmp") == 0) {
@@ -309,6 +317,25 @@ void execute(char *binary) {
 				int pop2 = *(int*)&prg_stack[sp];
 
 				memcpy((char*)pop1, &pop2, 4);
+			}
+			break;
+			case OP_CF2I32: {
+				sp -= 4;
+				float pop1 = *(float*)&prg_stack[sp];
+				int result = (int)pop1;
+
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_CI2F32: {
+				sp -= 4;
+				int pop1 = *(int*)&prg_stack[sp];
+
+				float result = (float)pop1;
+
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
 			}
 			break;
 			case OP_ADD: {
@@ -430,12 +457,38 @@ void execute(char *binary) {
 				sp += 4;
 			}
 			break;
+			case OP_CMPLTF: {
+				sp -= 4;
+				float pop1 = *(float*)&prg_stack[sp];
+
+				sp -= 4;
+				float pop2 = *(float*)&prg_stack[sp];
+
+				int result = pop1 < pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
 			case OP_CMPGT: {
 				sp -= 4;
 				int pop1 = *(int*)&prg_stack[sp];
 
 				sp -= 4;
 				int pop2 = *(int*)&prg_stack[sp];
+
+				int result = pop1 > pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_CMPGTF: {
+				sp -= 4;
+				float pop1 = *(float*)&prg_stack[sp];
+
+				sp -= 4;
+				float pop2 = *(float*)&prg_stack[sp];
 
 				int result = pop1 > pop2;
 				
@@ -515,6 +568,15 @@ void execute(char *binary) {
 					sp -= 4;
 					int pop1 = *(int*)&prg_stack[sp];
 					sleep(pop1);
+				} else if(left == 3) {
+					// socket
+					sp -= 4;
+					int family = *(int*)&prg_stack[sp];
+					sp -= 4;
+					int type = *(int*)&prg_stack[sp];
+					sp -= 4;
+					int protocol = *(int*)&prg_stack[sp];
+					
 				} else {
 					printf("unknown syscall code %i\n", left);
 					goto terminate;
