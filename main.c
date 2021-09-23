@@ -165,12 +165,16 @@ void resolve_code(char *code) {
 }
 
 OPCode get_op_by_string(char *name) {
-	if(strcmp(name, "push_int") == 0) {
-		return OP_PUSH;
-	} else if(strcmp(name, "load") == 0) {
-		return OP_LOAD;
-	} else if(strcmp(name, "store") == 0) {
-		return OP_STORE;
+	if(strcmp(name, "pushi") == 0) {
+		return OP_PUSHI;
+	} else if(strcmp(name, "loadi") == 0) {
+		return OP_LOADI;
+	} else if(strcmp(name, "storei") == 0) {
+		return OP_STOREI;
+	} else if(strcmp(name, "loadc") == 0) {
+		return OP_LOADC;
+	} else if(strcmp(name, "storec") == 0) {
+		return OP_STOREC;
 	} else if(strcmp(name, "lda") == 0) {
 		return OP_LDA;
 	} else if(strcmp(name, "deref") == 0) {
@@ -197,6 +201,14 @@ OPCode get_op_by_string(char *name) {
 		return OP_DIV;
 	} else if(strcmp(name, "divf") == 0) {
 		return OP_DIVF;
+	} else if(strcmp(name, "mod") == 0) {
+		return OP_MOD;
+	} else if(strcmp(name, "shl") == 0) {
+		return OP_SHL;
+	} else if(strcmp(name, "shr") == 0) {
+		return OP_SHR;
+	} else if(strcmp(name, "and") == 0) {
+		return OP_AND;
 	} else if(strcmp(name, "cmplt") == 0) {
 		return OP_CMPLT;
 	} else if(strcmp(name, "cmpltf") == 0) {
@@ -205,6 +217,8 @@ OPCode get_op_by_string(char *name) {
 		return OP_CMPGT;
 	} else if(strcmp(name, "cmpgtf") == 0) {
 		return OP_CMPGTF;
+	} else if(strcmp(name, "neq") == 0) {
+		return OP_NEQ;
 	} else if(strcmp(name, "je") == 0) {
 		return OP_JE;
 	} else if(strcmp(name, "jmp") == 0) {
@@ -275,21 +289,29 @@ void execute(char *binary) {
 		int left  = *(int*)(&binary[offset + sizeof(OPCode)]);
 		int right = *(int*)(&binary[offset + sizeof(OPCode) + sizeof(int)]);
 
-		//printf("%i %i %i\n", op, left, right);
-
 		switch(op) {
-			case OP_PUSH: {
+			case OP_PUSHI: {
 				memcpy(&prg_stack[sp], &left, 4);
 				sp += 4;
 			}
 			break;
-			case OP_LOAD: {
+			case OP_LOADI: {
 				memcpy(&prg_stack[sp], &var_stack[left], 4);
 				sp += 4;
 			}
 			break;
-			case OP_STORE: {
+			case OP_STOREI: {
 				sp -= 4;
+				memcpy(&var_stack[left], &prg_stack[sp], 4);
+			}
+			break;
+			case OP_LOADC: {
+				memcpy(&prg_stack[sp], &var_stack[left], 4);
+				sp += 1;
+			}
+			break;
+			case OP_STOREC: {
+				sp -= 1;
 				memcpy(&var_stack[left], &prg_stack[sp], 4);
 			}
 			break;
@@ -444,6 +466,58 @@ void execute(char *binary) {
 				sp += 4;
 			}
 			break;
+			case OP_MOD: {
+				sp -= 4;
+				int pop1 = *(int*)&prg_stack[sp];
+
+				sp -= 4;
+				int pop2 = *(int*)&prg_stack[sp];
+
+				int result = pop1 % pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_SHL: {
+				sp -= 4;
+				int pop1 = *(int*)&prg_stack[sp];
+
+				sp -= 4;
+				int pop2 = *(int*)&prg_stack[sp];
+
+				int result = pop1 << pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_SHR: {
+				sp -= 4;
+				int pop1 = *(int*)&prg_stack[sp];
+
+				sp -= 4;
+				int pop2 = *(int*)&prg_stack[sp];
+
+				int result = pop1 >> pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
+			case OP_AND: {
+				sp -= 4;
+				int pop1 = *(int*)&prg_stack[sp];
+
+				sp -= 4;
+				int pop2 = *(int*)&prg_stack[sp];
+
+				int result = pop1 & pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
 			case OP_CMPLT: {
 				sp -= 4;
 				int pop1 = *(int*)&prg_stack[sp];
@@ -496,6 +570,19 @@ void execute(char *binary) {
 				sp += 4;
 			}
 			break;
+			case OP_NEQ: {
+				sp -= 4;
+				int pop1 = *(int*)&prg_stack[sp];
+
+				sp -= 4;
+				int pop2 = *(int*)&prg_stack[sp];
+
+				int result = pop1 != pop2;
+				
+				memcpy(&prg_stack[sp], &result, 4);
+				sp += 4;
+			}
+			break;
 			case OP_RET: {
 				if(list_size(&return_ip) > 0) {
 
@@ -503,6 +590,9 @@ void execute(char *binary) {
 					ip = rtn->index;
 
 					memcpy(&rtn->prg_stack[sp - left], &prg_stack[sp - left], left);
+
+					free(prg_stack);
+					free(var_stack);
 
 					prg_stack = rtn->prg_stack;
 					var_stack = rtn->var_stack;

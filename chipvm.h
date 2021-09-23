@@ -4,9 +4,11 @@
 #include "list.h"
 
 typedef enum {
-	OP_PUSH,
-	OP_LOAD,
-	OP_STORE,
+	OP_PUSHI,
+	OP_LOADI,
+	OP_STOREI,
+	OP_LOADC,
+	OP_STOREC,
 	OP_LDA,
 	OP_DEREF,
 	OP_STA,
@@ -22,15 +24,22 @@ typedef enum {
 	OP_MULF,
 	OP_DIV,
 	OP_DIVF,
+	OP_MOD,
+
+	OP_SHL,
+	OP_SHR,
+	OP_AND,
 
 	OP_CMPLT,
 	OP_CMPLTF,
 	OP_CMPGT,
 	OP_CMPGTF,
+	OP_NEQ,
 
 	OP_JE,
 	OP_JMP,
 	OP_CALL,
+	
 	OP_SYSCALL,
 
 	OP_RET
